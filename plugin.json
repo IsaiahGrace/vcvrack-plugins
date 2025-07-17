@@ -1,0 +1,16 @@
+{
+  "slug": "mux",
+  "name": "mux",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "brand": "igrace",
+  "author": "Isaiah Grace",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": []
+}
