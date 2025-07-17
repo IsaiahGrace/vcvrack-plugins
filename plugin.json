@@ -12,5 +12,14 @@
   "sourceUrl": "",
   "donateUrl": "",
   "changelogUrl": "",
-  "modules": []
+  "modules": [
+    {
+      "slug": "mux1",
+      "name": "mux1",
+      "description": "One bit multiplexer",
+      "tags": [
+        "mixer"
+      ]
+    }
+  ]
 }
