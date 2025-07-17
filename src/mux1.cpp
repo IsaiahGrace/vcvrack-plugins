@@ -23,15 +23,40 @@ struct Mux1 : Module {
 		LIGHTS_LEN
 	};
 
+	dsp::ClockDivider lightDivider;
+
 	Mux1() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configInput(SEL0_INPUT, "");
 		configInput(IN0_INPUT, "");
 		configInput(IN1_INPUT, "");
 		configOutput(OUT_OUTPUT, "");
+
+		lightDivider.setDivision(32);
 	}
 
 	void process(const ProcessArgs& args) override {
+		bool sel = inputs[SEL0_INPUT].getVoltage() >= 1.0;
+		float in0 = inputs[IN0_INPUT].getVoltage();
+		float in1 = inputs[IN1_INPUT].getVoltage();
+		if (sel) {
+			outputs[OUT_OUTPUT].setVoltage(in1);
+		} else {
+			outputs[OUT_OUTPUT].setVoltage(in0);
+		}
+
+		if (lightDivider.process()) {
+			float lightTime = args.sampleTime * lightDivider.getDivision();
+			lights[IN0_LED_LIGHT].setBrightnessSmooth(in0, lightTime);
+			lights[IN1_LED_LIGHT].setBrightnessSmooth(in1, lightTime);
+			if (sel) {
+				lights[SEL_LED_LIGHT].setBrightness(1);
+				lights[OUT_LED_LIGHT].setBrightnessSmooth(in1, lightTime);
+			} else {
+				lights[SEL_LED_LIGHT].setBrightness(0);
+				lights[OUT_LED_LIGHT].setBrightnessSmooth(in0, lightTime);
+			}
+		}
 	}
 };
 
@@ -52,10 +77,10 @@ struct Mux1Widget : ModuleWidget {
 
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.64, 71.12)), module, Mux1::OUT_OUTPUT));
 
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(25.4, 43.18)), module, Mux1::SEL_LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(17.78, 60.96)), module, Mux1::IN0_LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(33.02, 71.12)), module, Mux1::OUT_LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(17.78, 81.28)), module, Mux1::IN1_LED_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(mm2px(Vec(25.4, 43.18)), module, Mux1::SEL_LED_LIGHT));
+		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(17.78, 60.96)), module, Mux1::IN0_LED_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(33.02, 71.12)), module, Mux1::OUT_LED_LIGHT));
+		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(17.78, 81.28)), module, Mux1::IN1_LED_LIGHT));
 	}
 };
 
