@@ -24,6 +24,9 @@ struct Mux1 : Module {
 	};
 
 	dsp::ClockDivider lightDivider;
+	dsp::SlewLimiter clickFilter;
+
+	bool declick = false;
 
 	Mux1() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -32,17 +35,32 @@ struct Mux1 : Module {
 		configInput(IN1_INPUT, "");
 		configOutput(OUT_OUTPUT, "");
 
+		clickFilter.rise = 400.f; // Hz
+		clickFilter.fall = 400.f; // Hz
+
 		lightDivider.setDivision(32);
 	}
 
+	void onReset(const ResetEvent& e) override {
+		Module::onReset(e);
+		declick = false;
+	}
+
 	void process(const ProcessArgs& args) override {
-		bool sel = inputs[SEL0_INPUT].getVoltage() >= 1.0;
+		bool sel = inputs[SEL0_INPUT].getVoltage() >= 1.f;
 		float in0 = inputs[IN0_INPUT].getVoltage();
 		float in1 = inputs[IN1_INPUT].getVoltage();
-		if (sel) {
-			outputs[OUT_OUTPUT].setVoltage(in1);
+
+		if (declick) {
+			float gain = clickFilter.process(args.sampleTime, sel);
+			float voltage = (in1 * gain) + (in0 * (1.f - gain));
+			outputs[OUT_OUTPUT].setVoltage(voltage);
 		} else {
-			outputs[OUT_OUTPUT].setVoltage(in0);
+			if (sel) {
+				outputs[OUT_OUTPUT].setVoltage(in1);
+			} else {
+				outputs[OUT_OUTPUT].setVoltage(in0);
+			}
 		}
 
 		if (lightDivider.process()) {
@@ -50,13 +68,24 @@ struct Mux1 : Module {
 			lights[IN0_LED_LIGHT].setBrightnessSmooth(in0, lightTime);
 			lights[IN1_LED_LIGHT].setBrightnessSmooth(in1, lightTime);
 			if (sel) {
-				lights[SEL_LED_LIGHT].setBrightness(1);
+				lights[SEL_LED_LIGHT].setBrightness(1.f);
 				lights[OUT_LED_LIGHT].setBrightnessSmooth(in1, lightTime);
 			} else {
-				lights[SEL_LED_LIGHT].setBrightness(0);
+				lights[SEL_LED_LIGHT].setBrightness(0.f);
 				lights[OUT_LED_LIGHT].setBrightnessSmooth(in0, lightTime);
 			}
 		}
+	}
+
+	json_t* dataToJson() override {
+		json_t* rootJ = json_object();
+		json_object_set_new(rootJ, "declick", json_boolean(declick));
+		return rootJ;
+	}
+
+	void dataFromJson(json_t* rootJ) override {
+		json_t* declickJ = json_object_get(rootJ, "declick");
+		declick = json_boolean_value(declickJ);
 	}
 };
 
@@ -81,6 +110,14 @@ struct Mux1Widget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(17.78, 60.96)), module, Mux1::IN0_LED_LIGHT));
 		addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(33.02, 71.12)), module, Mux1::OUT_LED_LIGHT));
 		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(17.78, 81.28)), module, Mux1::IN1_LED_LIGHT));
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Mux1* module = getModule<Mux1>();
+
+		menu->addChild(new MenuSeparator);
+
+		menu->addChild(createBoolPtrMenuItem("De-click", "", &module->declick));
 	}
 };
 
